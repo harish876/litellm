@@ -763,6 +763,7 @@ def _remove_thought_signatures_from_messages(
 def function_setup(  # noqa: PLR0915
     original_function: str, rules_obj, start_time, *args, **kwargs
 ):  # just run once to check if user wants to send their data anywhere - PostHog/Sentry/Slack/etc.
+    CallTypes = getattr(sys.modules[__name__], "CallTypes")
     ### NOTICES ###
     if litellm.set_verbose is True:
         verbose_logger.warning(
@@ -1314,6 +1315,8 @@ def post_call_processing(
     original_function,
     rules_obj,
 ):
+    CallTypes = getattr(sys.modules[__name__], "CallTypes")
+    ModelResponse = getattr(sys.modules[__name__], "ModelResponse")
     try:
         if original_response is None:
             pass
@@ -1434,6 +1437,8 @@ def client(original_function):  # noqa: PLR0915
 
     @wraps(original_function)
     def wrapper(*args, **kwargs):  # noqa: PLR0915
+        CallTypes = getattr(sys.modules[__name__], "CallTypes")
+        EmbeddingResponse = getattr(sys.modules[__name__], "EmbeddingResponse")
         # DO NOT MOVE THIS. It always needs to run first
         # Check if this is an async function. If so only execute the async function
         call_type = original_function.__name__
@@ -3617,7 +3622,7 @@ def filter_out_litellm_params(kwargs: dict) -> dict:
         >>> filtered = filter_out_litellm_params(kwargs)
         >>> # filtered = {"query": "test"}
     """
-
+    all_litellm_params = getattr(sys.modules[__name__], "all_litellm_params")
     return {
         key: value for key, value in kwargs.items() if key not in all_litellm_params
     }
@@ -5035,6 +5040,8 @@ def get_response_string(response_obj: Union[ModelResponse, ModelResponseStream])
             return delta if isinstance(delta, str) else ""
 
     # Handle standard ModelResponse and ModelResponseStream
+    Choices = getattr(sys.modules[__name__], "Choices")
+    StreamingChoices = getattr(sys.modules[__name__], "StreamingChoices")
     _choices: Union[List[Choices], List[StreamingChoices]] = response_obj.choices
 
     # Use list accumulation to avoid O(n^2) string concatenation across choices
@@ -5514,6 +5521,7 @@ def _get_model_info_helper(  # noqa: PLR0915
     """
     Helper for 'get_model_info'. Separated out to avoid infinite loop caused by returning 'supported_openai_param's
     """
+    ModelInfoBase = getattr(sys.modules[__name__], "ModelInfoBase")
     try:
         azure_llms = {**litellm.azure_llms, **litellm.azure_embedding_models}
         if model in azure_llms:
@@ -5899,6 +5907,7 @@ def get_model_info(
             "supported_openai_params": ["temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty"]
         }
     """
+    ModelInfo = getattr(sys.modules[__name__], "ModelInfo")
     supported_openai_params = litellm.get_supported_openai_params(
         model=model, custom_llm_provider=custom_llm_provider
     )
@@ -6779,6 +6788,9 @@ class TextCompletionStreamWrapper:
         return self
 
     def convert_to_text_completion_object(self, chunk: ModelResponse):
+        TextCompletionResponse = getattr(sys.modules[__name__], "TextCompletionResponse")
+        TextChoices = getattr(sys.modules[__name__], "TextChoices")
+        Choices = getattr(sys.modules[__name__], "Choices")
         try:
             response = TextCompletionResponse()
             response["id"] = chunk.get("id", None)
@@ -6812,6 +6824,7 @@ class TextCompletionStreamWrapper:
 
     def __next__(self):
         # model_response = ModelResponse(stream=True, model=self.model)
+        TextCompletionResponse = getattr(sys.modules[__name__], "TextCompletionResponse")
         TextCompletionResponse()
         try:
             for chunk in self.completion_stream:
@@ -6847,6 +6860,8 @@ class TextCompletionStreamWrapper:
 def mock_completion_streaming_obj(
     model_response, mock_response, model, n: Optional[int] = None
 ):
+    ModelResponseStream = getattr(sys.modules[__name__], "ModelResponseStream")
+    Delta = getattr(sys.modules[__name__], "Delta")
     if isinstance(mock_response, litellm.MockException):
         raise mock_response
     if isinstance(mock_response, ModelResponseStream):
@@ -6876,6 +6891,8 @@ async def async_mock_completion_streaming_obj(
     model,
     n: Optional[int] = None,
 ):
+    ModelResponseStream = getattr(sys.modules[__name__], "ModelResponseStream")
+    Delta = getattr(sys.modules[__name__], "Delta")
     if isinstance(mock_response, litellm.MockException):
         raise mock_response
     if isinstance(mock_response, ModelResponseStream):
@@ -7468,6 +7485,7 @@ def _get_base_model_from_metadata(model_call_details=None):
 
 class ModelResponseIterator:
     def __init__(self, model_response: ModelResponse, convert_to_delta: bool = False):
+        ModelResponseStream = getattr(sys.modules[__name__], "ModelResponseStream")
         if convert_to_delta is True:
             _stream_response = ModelResponseStream()
             _stream_response.choices[0].delta.content = model_response.choices[0].message.content  # type: ignore
@@ -8140,6 +8158,7 @@ class ProviderConfigManager:
         Uses O(1) dictionary lookup for fast provider resolution.
         Python classes take priority over JSON (they have custom overrides).
         """
+        LlmProviders = getattr(sys.modules[__name__], "LlmProviders")
         # Handle OpenAI special cases (O-series and GPT-5 models)
         if provider == LlmProviders.OPENAI:
             if litellm.openaiOSeriesConfig.is_model_o_series_model(model=model):
@@ -9368,6 +9387,7 @@ def return_raw_request(endpoint: CallTypes, kwargs: dict) -> RawRequestTypedDict
 
     This is currently in BETA, and tested for `/chat/completions` -> `litellm.completion` calls.
     """
+    RawRequestTypedDict = getattr(sys.modules[__name__], "RawRequestTypedDict")
     from datetime import datetime
 
     from litellm.litellm_core_utils.litellm_logging import Logging
@@ -9425,6 +9445,7 @@ def jsonify_tools(tools: List[Any]) -> List[Dict]:
 
 
 def get_empty_usage() -> Usage:
+    Usage = getattr(sys.modules[__name__], "Usage")
     return Usage(
         prompt_tokens=0,
         completion_tokens=0,
