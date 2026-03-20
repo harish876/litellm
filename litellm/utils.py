@@ -5907,7 +5907,6 @@ def get_model_info(
             "supported_openai_params": ["temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty"]
         }
     """
-    ModelInfo = getattr(sys.modules[__name__], "ModelInfo")
     supported_openai_params = litellm.get_supported_openai_params(
         model=model, custom_llm_provider=custom_llm_provider
     )
@@ -5929,11 +5928,8 @@ def get_model_info(
     # if verbose_logger.isEnabledFor(logging.DEBUG):
     # verbose_logger.debug(f"model_info: {_model_info}")
 
-    returned_model_info = ModelInfo(
-        **_model_info, supported_openai_params=supported_openai_params
-    )
-
-    return returned_model_info
+    _model_info["supported_openai_params"] = supported_openai_params
+    return cast("ModelInfo", _model_info)
 
 
 def json_schema_type(python_type_name: str):
