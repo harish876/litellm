@@ -1508,11 +1508,11 @@ class Usage(SafeAttributeModel, CompletionUsage):
     server_tool_use: Optional[ServerToolUse] = None
     cost: Optional[float] = None
 
-    completion_tokens_details: Optional[CompletionTokensDetailsWrapper] = None
-    """Breakdown of tokens used in a completion."""
+    completion_tokens_details: Optional[CompletionTokensDetails] = None
+    """Breakdown of tokens used in a completion. Stored as CompletionTokensDetailsWrapper at runtime."""
 
-    prompt_tokens_details: Optional[PromptTokensDetailsWrapper] = None
-    """Breakdown of tokens used in the prompt."""
+    prompt_tokens_details: Optional[PromptTokensDetails] = None
+    """Breakdown of tokens used in the prompt. Stored as PromptTokensDetailsWrapper at runtime."""
 
     def __init__(  # noqa: PLR0915
         self,

@@ -1,4 +1,6 @@
-from typing import List, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Optional
 
 import litellm
 from litellm._logging import verbose_logger
@@ -7,8 +9,9 @@ from litellm.integrations.custom_logger import CustomLogger
 from litellm.litellm_core_utils.llm_request_utils import (
     get_proxy_server_request_headers,
 )
-from litellm.proxy._types import CommonProxyErrors
-from litellm.types.utils import StandardCallbackDynamicParams
+
+if TYPE_CHECKING:
+    from litellm.types.utils import StandardCallbackDynamicParams
 
 
 class EnterpriseCallbackControls:
@@ -95,5 +98,7 @@ class EnterpriseCallbackControls:
         
         if premium_user:
             return True
+        from litellm.proxy._types import CommonProxyErrors
+
         verbose_logger.warning(f"Disabling callbacks using request headers is an enterprise feature. {CommonProxyErrors.not_premium_user.value}")
         return False

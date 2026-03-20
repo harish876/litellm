@@ -78,7 +78,7 @@ LLM_CLIENT_CACHE_NAMES = (
 BEDROCK_TYPES_NAMES = ("COHERE_EMBEDDING_INPUT_TYPES",)
 
 # Common types from litellm.types.utils that support lazy loading via
-# _lazy_import_types_utils
+# _lazy_import_types_utils (includes all names previously imported by utils.py)
 TYPES_UTILS_NAMES = (
     "ImageObject",
     "BudgetConfig",
@@ -89,6 +89,36 @@ TYPES_UTILS_NAMES = (
     "StandardKeyGenerationConfig",
     "SearchProviders",
     "GenericStreamingChunk",
+    # Names used by utils.py - moved here to defer types.utils import
+    "OPENAI_RESPONSE_HEADERS",
+    "CallTypes",
+    "ChatCompletionDeltaToolCall",
+    "ChatCompletionMessageToolCall",
+    "Choices",
+    "CostPerToken",
+    "CustomHuggingfaceTokenizer",
+    "Delta",
+    "Embedding",
+    "EmbeddingResponse",
+    "Function",
+    "ImageResponse",
+    "LlmProviders",
+    "LlmProvidersSet",
+    "LLMResponseTypes",
+    "Message",
+    "ModelInfo",
+    "ModelInfoBase",
+    "ModelResponse",
+    "ModelResponseStream",
+    "ProviderField",
+    "ProviderSpecificModelInfo",
+    "RawRequestTypedDict",
+    "SelectTokenizerResponse",
+    "StreamingChoices",
+    "TextChoices",
+    "TextCompletionResponse",
+    "TranscriptionResponse",
+    "Usage",
 )
 
 # Caching / cache classes that support lazy loading via _lazy_import_caching
@@ -484,6 +514,36 @@ _TYPES_UTILS_IMPORT_MAP = {
     "StandardKeyGenerationConfig": (".types.utils", "StandardKeyGenerationConfig"),
     "SearchProviders": (".types.utils", "SearchProviders"),
     "GenericStreamingChunk": (".types.utils", "GenericStreamingChunk"),
+    # Names used by utils.py
+    "OPENAI_RESPONSE_HEADERS": (".types.utils", "OPENAI_RESPONSE_HEADERS"),
+    "CallTypes": (".types.utils", "CallTypes"),
+    "ChatCompletionDeltaToolCall": (".types.utils", "ChatCompletionDeltaToolCall"),
+    "ChatCompletionMessageToolCall": (".types.utils", "ChatCompletionMessageToolCall"),
+    "Choices": (".types.utils", "Choices"),
+    "CostPerToken": (".types.utils", "CostPerToken"),
+    "CustomHuggingfaceTokenizer": (".types.utils", "CustomHuggingfaceTokenizer"),
+    "Delta": (".types.utils", "Delta"),
+    "Embedding": (".types.utils", "Embedding"),
+    "EmbeddingResponse": (".types.utils", "EmbeddingResponse"),
+    "Function": (".types.utils", "Function"),
+    "ImageResponse": (".types.utils", "ImageResponse"),
+    "LlmProviders": (".types.utils", "LlmProviders"),
+    "LlmProvidersSet": (".types.utils", "LlmProvidersSet"),
+    "LLMResponseTypes": (".types.utils", "LLMResponseTypes"),
+    "Message": (".types.utils", "Message"),
+    "ModelInfo": (".types.utils", "ModelInfo"),
+    "ModelInfoBase": (".types.utils", "ModelInfoBase"),
+    "ModelResponse": (".types.utils", "ModelResponse"),
+    "ModelResponseStream": (".types.utils", "ModelResponseStream"),
+    "ProviderField": (".types.utils", "ProviderField"),
+    "ProviderSpecificModelInfo": (".types.utils", "ProviderSpecificModelInfo"),
+    "RawRequestTypedDict": (".types.utils", "RawRequestTypedDict"),
+    "SelectTokenizerResponse": (".types.utils", "SelectTokenizerResponse"),
+    "StreamingChoices": (".types.utils", "StreamingChoices"),
+    "TextChoices": (".types.utils", "TextChoices"),
+    "TextCompletionResponse": (".types.utils", "TextCompletionResponse"),
+    "TranscriptionResponse": (".types.utils", "TranscriptionResponse"),
+    "Usage": (".types.utils", "Usage"),
 }
 
 _TOKEN_COUNTER_IMPORT_MAP = {

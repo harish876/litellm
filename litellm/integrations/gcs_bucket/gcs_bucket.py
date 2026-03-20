@@ -12,7 +12,6 @@ from litellm._logging import verbose_logger
 from litellm.constants import LITELLM_ASYNCIO_QUEUE_MAXSIZE
 from litellm.integrations.additional_logging_utils import AdditionalLoggingUtils
 from litellm.integrations.gcs_bucket.gcs_bucket_base import GCSBucketBase
-from litellm.proxy._types import CommonProxyErrors
 from litellm.types.integrations.base_health_check import IntegrationHealthCheckStatus
 from litellm.types.integrations.gcs_bucket import *
 from litellm.types.utils import StandardLoggingPayload
@@ -52,6 +51,8 @@ class GCSBucketLogger(GCSBucketBase, AdditionalLoggingUtils):
         AdditionalLoggingUtils.__init__(self)
 
         if premium_user is not True:
+            from litellm.proxy._types import CommonProxyErrors
+
             raise ValueError(
                 f"GCS Bucket logging is a premium feature. Please upgrade to use it. {CommonProxyErrors.not_premium_user.value}"
             )
@@ -61,6 +62,8 @@ class GCSBucketLogger(GCSBucketBase, AdditionalLoggingUtils):
         from litellm.proxy.proxy_server import premium_user
 
         if premium_user is not True:
+            from litellm.proxy._types import CommonProxyErrors
+
             raise ValueError(
                 f"GCS Bucket logging is a premium feature. Please upgrade to use it. {CommonProxyErrors.not_premium_user.value}"
             )

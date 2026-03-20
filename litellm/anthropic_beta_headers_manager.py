@@ -29,7 +29,7 @@ from typing import Dict, List, Optional, Set
 
 import httpx
 
-from litellm.litellm_core_utils.litellm_logging import verbose_logger
+from litellm._logging import verbose_logger
 
 # Cache for the loaded configuration
 _BETA_HEADERS_CONFIG: Optional[Dict] = None

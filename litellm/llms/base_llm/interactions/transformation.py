@@ -9,25 +9,27 @@ Per OpenAPI spec (https://ai.google.dev/static/api/interactions.openapi.json):
 - Delete: DELETE /{api_version}/interactions/{interaction_id}
 """
 
+from __future__ import annotations
+
 import types
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import httpx
 
-from litellm.types.interactions import (
-    CancelInteractionResult,
-    DeleteInteractionResult,
-    InteractionInput,
-    InteractionsAPIOptionalRequestParams,
-    InteractionsAPIResponse,
-    InteractionsAPIStreamingResponse,
-)
 from litellm.types.router import GenericLiteLLMParams
 from litellm.types.utils import LlmProviders
 
 if TYPE_CHECKING:
     from litellm.litellm_core_utils.litellm_logging import Logging as _LiteLLMLoggingObj
+    from litellm.types.interactions import (
+        CancelInteractionResult,
+        DeleteInteractionResult,
+        InteractionInput,
+        InteractionsAPIOptionalRequestParams,
+        InteractionsAPIResponse,
+        InteractionsAPIStreamingResponse,
+    )
 
     from ..chat.transformation import BaseLLMException as _BaseLLMException
 

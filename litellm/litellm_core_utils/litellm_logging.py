@@ -53,7 +53,6 @@ from litellm.cost_calculator import (
 )
 from litellm.integrations.agentops import AgentOps
 from litellm.integrations.anthropic_cache_control_hook import AnthropicCacheControlHook
-from litellm.integrations.arize.arize import ArizeLogger
 from litellm.integrations.custom_guardrail import CustomGuardrail
 from litellm.integrations.custom_logger import CustomLogger
 from litellm.integrations.deepeval.deepeval import DeepEvalLogger
@@ -3629,6 +3628,7 @@ def _init_custom_logger_compatible_class(  # noqa: PLR0915
     """
     Initialize a custom logger compatible class
     """
+    from litellm.integrations.arize.arize import ArizeLogger
     try:
         custom_logger_init_args = custom_logger_init_args or {}
         if logging_integration == "agentops":  # Add AgentOps initialization
@@ -4260,6 +4260,7 @@ def _maybe_auto_initialize_arize_phoenix(_in_memory_loggers: list) -> None:
 
     try:
         from litellm.integrations.opentelemetry import OpenTelemetryConfig
+        from litellm.integrations.arize.arize import ArizeLogger
 
         arize_phoenix_config = ArizePhoenixLogger.get_arize_phoenix_config()
         otel_config = OpenTelemetryConfig(
@@ -4288,6 +4289,7 @@ def _maybe_auto_initialize_arize_phoenix(_in_memory_loggers: list) -> None:
 def get_custom_logger_compatible_class(  # noqa: PLR0915
     logging_integration: _custom_logger_compatible_callbacks_literal,
 ) -> Optional[CustomLogger]:
+    from litellm.integrations.arize.arize import ArizeLogger
     try:
         if logging_integration == "lago":
             for callback in _in_memory_loggers:

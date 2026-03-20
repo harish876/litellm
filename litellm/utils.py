@@ -29,6 +29,7 @@ import time
 import traceback
 from dataclasses import dataclass, field
 from functools import lru_cache, wraps
+from typing import TYPE_CHECKING
 from importlib import resources
 from inspect import iscoroutine
 from io import StringIO
@@ -152,54 +153,29 @@ def _get_cached_audio_utils():
         _audio_utils_module = litellm.litellm_core_utils.audio_utils.utils
     return _audio_utils_module
 
+if TYPE_CHECKING:
+    from litellm.types.llms.openai import (
+        AllMessageValues,
+        ChatCompletionNamedToolChoiceParam,
+        ChatCompletionToolParam,
+        ChatCompletionToolParamFunctionChunk,
+        OpenAIWebSearchOptions,
+        )
+    
+# types.utils imports moved to lazy registry - see _lazy_imports_registry.TYPES_UTILS_NAMES
+# Access via utils.__getattr__ defers loading until first use
 
-from litellm.types.llms.openai import (
-    AllMessageValues,
-    AllPromptValues,
-    ChatCompletionAssistantToolCall,
-    ChatCompletionNamedToolChoiceParam,
-    ChatCompletionToolParam,
-    ChatCompletionToolParamFunctionChunk,
-    OpenAITextCompletionUserMessage,
-    OpenAIWebSearchOptions,
-)
-from litellm.types.utils import FileTypes  # type: ignore
-from litellm.types.utils import (
-    OPENAI_RESPONSE_HEADERS,
-    CallTypes,
-    ChatCompletionDeltaToolCall,
-    ChatCompletionMessageToolCall,
-    Choices,
-    CostPerToken,
-    CredentialItem,
-    CustomHuggingfaceTokenizer,
-    Delta,
-    Embedding,
-    EmbeddingResponse,
-    Function,
-    ImageResponse,
-    LlmProviders,
-    LlmProvidersSet,
-    LLMResponseTypes,
-    Message,
-    ModelInfo,
-    ModelInfoBase,
-    ModelResponse,
-    ModelResponseStream,
-    ProviderField,
-    ProviderSpecificModelInfo,
-    RawRequestTypedDict,
-    SearchProviders,
-    SelectTokenizerResponse,
-    StreamingChoices,
-    TextChoices,
-    TextCompletionResponse,
-    TranscriptionResponse,
-    Usage,
-    all_litellm_params,
-)
+_CALL_TYPE_ENUM_MAP: Optional[dict] = None
 
-_CALL_TYPE_ENUM_MAP: dict = {ct.value: ct for ct in CallTypes}
+
+def _get_call_type_enum_map() -> dict:
+    """Lazy-build _CALL_TYPE_ENUM_MAP to avoid importing types.utils at module load."""
+    global _CALL_TYPE_ENUM_MAP
+    if _CALL_TYPE_ENUM_MAP is None:
+        from litellm.types.utils import CallTypes
+
+        _CALL_TYPE_ENUM_MAP = {ct.value: ct for ct in CallTypes}
+    return _CALL_TYPE_ENUM_MAP
 
 # +-----------------------------------------------+
 # |                                               |
@@ -246,14 +222,40 @@ from typing import (
 from openai import OpenAIError as OriginalError
 
 # These are lazy loaded via __getattr__
-from litellm.llms.base_llm.base_utils import (
-    BaseLLMModelInfo,
-    type_to_response_format_param,
-)
+# from litellm.llms.base_llm.base_utils import (
+#     BaseLLMModelInfo,
+#     type_to_response_format_param,
+# )
 
 if TYPE_CHECKING:
     # Heavy types that are only needed for type checking; avoid importing
     # their modules at runtime during `litellm` import.
+    # Type stubs for lazy-loaded types from types.utils (resolved via __getattr__ at runtime)
+    from litellm.types.utils import (
+        CallTypes,
+        Choices,
+        CustomHuggingfaceTokenizer,
+        Delta,
+        EmbeddingResponse,
+        LLMResponseTypes,
+        LlmProviders,
+        LlmProvidersSet,
+        ModelInfo,
+        ModelInfoBase,
+        ModelResponse,
+        ModelResponseStream,
+        ProviderField,
+        ProviderSpecificModelInfo,
+        RawRequestTypedDict,
+        SearchProviders,
+        SelectTokenizerResponse,
+        StreamingChoices,
+        TextChoices,
+        TextCompletionResponse,
+        Usage,
+        all_litellm_params,
+    )
+
     from litellm.caching.caching_handler import (
         CachingHandlerResponse,
         LLMCachingHandler,
@@ -302,6 +304,7 @@ if TYPE_CHECKING:
     from litellm.llms.base_llm.text_to_speech.transformation import (
         BaseTextToSpeechConfig,
     )
+    from litellm.llms.base_llm.base_utils import BaseLLMModelInfo
     from litellm.llms.bedrock.common_utils import BedrockModelInfo
     from litellm.llms.cohere.common_utils import CohereModelInfo
     from litellm.llms.mistral.ocr.transformation import MistralOCRConfig
@@ -381,11 +384,12 @@ if TYPE_CHECKING:
     )
     from litellm.types.router import LiteLLM_Params
 
-from litellm.llms.base_llm.chat.transformation import BaseConfig
-from litellm.llms.base_llm.completion.transformation import BaseTextCompletionConfig
-from litellm.llms.base_llm.evals.transformation import BaseEvalsAPIConfig
-from litellm.llms.base_llm.responses.transformation import BaseResponsesAPIConfig
-from litellm.llms.base_llm.skills.transformation import BaseSkillsAPIConfig
+if TYPE_CHECKING:
+    from litellm.llms.base_llm.chat.transformation import BaseConfig
+    from litellm.llms.base_llm.completion.transformation import BaseTextCompletionConfig
+    from litellm.llms.base_llm.evals.transformation import BaseEvalsAPIConfig
+    from litellm.llms.base_llm.responses.transformation import BaseResponsesAPIConfig
+    from litellm.llms.base_llm.skills.transformation import BaseSkillsAPIConfig
 
 from ._logging import _is_debugging_on, verbose_logger
 from .caching.caching import (
@@ -1054,7 +1058,7 @@ def function_setup(  # noqa: PLR0915
             call_type == CallTypes.atranscription.value
             or call_type == CallTypes.transcription.value
         ):
-            _file_obj: FileTypes = args[1] if len(args) > 1 else kwargs["file"]
+            _file_obj = args[1] if len(args) > 1 else kwargs["file"]
             # Lazy import audio_utils.utils only when needed for transcription calls
             audio_utils = _get_cached_audio_utils()
             file_checksum = audio_utils.get_audio_file_content_hash(file_obj=_file_obj)
@@ -1284,6 +1288,8 @@ async def async_post_call_success_deployment_hook(
     """
     Allow modifying / reviewing the response just after it's received from the deployment.
     """
+    LLMResponseTypes = getattr(sys.modules[__name__], "LLMResponseTypes")
+    CallTypes = getattr(sys.modules[__name__], "CallTypes")
     try:
         typed_call_type = CallTypes(call_type)
     except ValueError:
@@ -1368,6 +1374,10 @@ def post_call_processing(
                                         elif _parsing._completions.is_basemodel_type(
                                             optional_params["response_format"]  # type: ignore
                                         ):
+                                            from litellm.llms.base_llm.base_utils import (
+                                                type_to_response_format_param,
+                                            )
+
                                             json_response_format = (
                                                 type_to_response_format_param(
                                                     response_format=optional_params[
@@ -1927,7 +1937,7 @@ def client(original_function):  # noqa: PLR0915
                 rules_obj=rules_obj,
             )
             # Only run if call_type is a valid value in CallTypes
-            _call_type_enum = _CALL_TYPE_ENUM_MAP.get(call_type)
+            _call_type_enum = _get_call_type_enum_map().get(call_type)
             if _call_type_enum is not None:
                 result = await async_post_call_success_deployment_hook(
                     request_data=kwargs,
@@ -2113,19 +2123,29 @@ def _is_async_request(
     return False
 
 
-_STREAMING_CALL_TYPES = frozenset(
-    {
-        CallTypes.generate_content_stream,
-        CallTypes.agenerate_content_stream,
-        CallTypes.generate_content_stream.value,
-        CallTypes.agenerate_content_stream.value,
-    }
-)
+_STREAMING_CALL_TYPES: Optional[frozenset] = None
+
+
+def _get_streaming_call_types() -> frozenset:
+    """Lazy-build _STREAMING_CALL_TYPES to avoid importing types.utils at module load."""
+    global _STREAMING_CALL_TYPES
+    if _STREAMING_CALL_TYPES is None:
+        from litellm.types.utils import CallTypes
+
+        _STREAMING_CALL_TYPES = frozenset(
+            {
+                CallTypes.generate_content_stream,
+                CallTypes.agenerate_content_stream,
+                CallTypes.generate_content_stream.value,
+                CallTypes.agenerate_content_stream.value,
+            }
+        )
+    return _STREAMING_CALL_TYPES
 
 
 def _is_streaming_request(
     kwargs: Dict[str, Any],
-    call_type: Union[CallTypes, str],
+    call_type: Union[Any, str],
 ) -> bool:
     """
     Returns True if the call type is a streaming request.
@@ -2135,7 +2155,7 @@ def _is_streaming_request(
     """
     if "stream" in kwargs and kwargs["stream"] is True:
         return True
-    return call_type in _STREAMING_CALL_TYPES
+    return call_type in _get_streaming_call_types()
 
 
 def _select_tokenizer(
@@ -2780,6 +2800,7 @@ def register_model(model_cost: Union[str, dict]):  # noqa: PLR0915
         },
     }
     """
+    LlmProviders = getattr(sys.modules[__name__], "LlmProviders")
 
     loaded_model_cost = {}
     if isinstance(model_cost, dict):
@@ -2953,6 +2974,7 @@ def get_optional_params_transcription(
             return non_default_params
 
     provider_config: Optional[BaseAudioTranscriptionConfig] = None
+    LlmProviders = getattr(sys.modules[__name__], "LlmProviders")
     if custom_llm_provider is not None:
         provider_config = ProviderConfigManager.get_provider_audio_transcription_config(
             model=model,
@@ -3201,6 +3223,7 @@ def get_optional_params_embeddings(  # noqa: PLR0915
     provider_config: Optional[BaseEmbeddingConfig] = None
 
     optional_params = {}
+    LlmProviders = getattr(sys.modules[__name__], "LlmProviders")
     if (
         custom_llm_provider is not None
         and custom_llm_provider in LlmProviders._member_map_.values()
@@ -3705,6 +3728,8 @@ def pre_process_non_default_params(
                 response_format=non_default_params["response_format"]
             )
         else:
+            from litellm.llms.base_llm.base_utils import type_to_response_format_param
+
             non_default_params["response_format"] = type_to_response_format_param(
                 response_format=non_default_params["response_format"]
             )
@@ -3902,6 +3927,7 @@ def get_optional_params(  # noqa: PLR0915
     passed_params = locals().copy()
     special_params = passed_params.pop("kwargs")
     provider_config: Optional[BaseConfig] = None
+    LlmProviders = getattr(sys.modules[__name__], "LlmProviders")
     if custom_llm_provider is not None and custom_llm_provider in [
         provider.value for provider in LlmProviders
     ]:
@@ -5453,6 +5479,8 @@ def get_provider_info(
     # if custom_llm_provider == "predibase":
     #     _model_info["supports_response_schema"] = True
     provider_config: Optional[BaseLLMModelInfo] = None
+    LlmProviders = getattr(sys.modules[__name__], "LlmProviders")
+    LlmProvidersSet = getattr(sys.modules[__name__], "LlmProvidersSet")
     if custom_llm_provider and custom_llm_provider in LlmProvidersSet:
         # Check if the provider string exists in LlmProviders enum
         provider_config = ProviderConfigManager.get_provider_model_info(
@@ -7312,6 +7340,7 @@ def get_valid_models(
         else:
             valid_providers = _infer_valid_provider_from_env_vars(custom_llm_provider)
 
+        LlmProviders = getattr(sys.modules[__name__], "LlmProviders")
         for provider in valid_providers:
             provider_config = ProviderConfigManager.get_provider_model_info(
                 model=None,
@@ -7892,6 +7921,7 @@ class ProviderConfigManager:
         Returns a dict mapping provider to (factory_function, needs_model_parameter).
         This avoids expensive inspect.signature() calls at runtime.
         """
+        LlmProviders = getattr(sys.modules[__name__], "LlmProviders")
         return {
             # Most common providers first for readability
             # Format: (factory_function, needs_model_parameter: bool)
@@ -9416,7 +9446,8 @@ def should_run_mock_completion(
 
 def __getattr__(name: str) -> Any:
     """Lazy import handler for utils module with cached registry for improved performance."""
-    # Use cached registry from _lazy_imports instead of importing tuples every time
+    import sys
+
     from litellm._lazy_imports import _get_lazy_import_registry
 
     registry = _get_lazy_import_registry()
@@ -9424,6 +9455,9 @@ def __getattr__(name: str) -> Any:
     # Check if name is in registry and call the cached handler function
     if name in registry:
         handler_func = registry[name]
-        return handler_func(name)
+        val = handler_func(name)
+        # Cache in utils so future lookups from within utils don't need __getattr__
+        sys.modules[__name__].__dict__[name] = val
+        return val
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
