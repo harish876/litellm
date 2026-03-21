@@ -1597,7 +1597,7 @@ async def move_guardrails_to_metadata(
     if not (has_key_config or has_team_config or has_request_config):
         from litellm.proxy.policy_engine.policy_registry import get_policy_registry
 
-        if not get_policy_registry().is_initialized():
+        if not get_policy_registry().is_initialized() or len(get_policy_registry().get_all_policies()) == 0:
             # Nothing configured anywhere - clean up request body fields and return
             data.pop("policies", None)
             return
@@ -1623,7 +1623,7 @@ async def move_guardrails_to_metadata(
     #########################################################################################
     # Add guardrails from policy engine based on team/key/model context
     #########################################################################################
-    await add_guardrails_from_policy_engine(
+    add_guardrails_from_policy_engine(
         data=data,
         metadata_variable_name=_metadata_variable_name,
         user_api_key_dict=user_api_key_dict,
@@ -1811,7 +1811,7 @@ def _apply_resolved_guardrails_to_metadata(
     )
 
 
-async def add_guardrails_from_policy_engine(
+def add_guardrails_from_policy_engine(
     data: dict,
     metadata_variable_name: str,
     user_api_key_dict: UserAPIKeyAuth,
