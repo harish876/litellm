@@ -1195,20 +1195,16 @@ def _should_check_db(
     key: str, last_db_access_time: LimitedSizeOrderedDict, db_cache_expiry: int
 ) -> bool:
     """
-    Prevent calling db repeatedly for items that don't exist in the db.
+    Throttle DB checks per key using last DB access timestamp.
     """
     current_time = time.time()
-    # if key doesn't exist in last_db_access_time -> check db
+    # If key has never been checked, hit DB once.
     if key not in last_db_access_time:
         return True
-    elif (
-        last_db_access_time[key][0] is not None
-    ):  # check db for non-null values (for refresh operations)
-        return True
-    elif last_db_access_time[key][0] is None:
-        if current_time - last_db_access_time[key] >= db_cache_expiry:
-            return True
-    return False
+
+    # last_db_access_time[key] stores tuple(value, timestamp)
+    _, last_checked_ts = last_db_access_time[key]
+    return (current_time - last_checked_ts) >= db_cache_expiry
 
 
 def _update_last_db_access_time(
