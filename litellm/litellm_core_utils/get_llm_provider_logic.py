@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import FrozenSet, Optional, Tuple
 
 import litellm
 from litellm.constants import REPLICATE_MODEL_NAME_WITH_ID_LENGTH
@@ -96,6 +96,51 @@ def handle_anthropic_text_model_custom_llm_provider(
     return model, custom_llm_provider
 
 
+_provider_list_set_cache: Optional[FrozenSet[str]] = None
+_provider_list_cache_identity: Optional[int] = None
+_provider_list_cache_len: int = -1
+
+_openai_compat_endpoints_sorted: Optional[Tuple[str, ...]] = None
+_openai_compat_endpoints_cache_id: Optional[int] = None
+
+
+def _get_provider_list_set() -> FrozenSet[str]:
+    """
+    O(1) membership for provider checks. Rebuilt when litellm.provider_list is
+    replaced or its length changes (e.g. append from dynamic providers).
+    """
+    global _provider_list_set_cache, _provider_list_cache_identity, _provider_list_cache_len
+    pl = litellm.provider_list
+    pl_id = id(pl)
+    pl_len = len(pl)
+    if (
+        _provider_list_set_cache is None
+        or pl_id != _provider_list_cache_identity
+        or pl_len != _provider_list_cache_len
+    ):
+        _provider_list_set_cache = frozenset(pl)
+        _provider_list_cache_identity = pl_id
+        _provider_list_cache_len = pl_len
+    return _provider_list_set_cache
+
+
+def _get_openai_compatible_endpoints_longest_first() -> Tuple[str, ...]:
+    """
+    Prefer longer endpoint strings first so `endpoint in api_base` resolves to the
+    most specific match (e.g. path-specific URLs before shorter shared hosts).
+    """
+    global _openai_compat_endpoints_sorted, _openai_compat_endpoints_cache_id
+    ep = litellm.openai_compatible_endpoints
+    ep_id = id(ep)
+    if (
+        _openai_compat_endpoints_sorted is None
+        or ep_id != _openai_compat_endpoints_cache_id
+    ):
+        _openai_compat_endpoints_sorted = tuple(sorted(ep, key=len, reverse=True))
+        _openai_compat_endpoints_cache_id = ep_id
+    return _openai_compat_endpoints_sorted
+
+
 def get_llm_provider(  # noqa: PLR0915
     model: str,
     custom_llm_provider: Optional[str] = None,
@@ -153,10 +198,19 @@ def get_llm_provider(  # noqa: PLR0915
             model, custom_llm_provider
         )
 
+        _s = model.split("/", 1)
+        model_first = _s[0]
+        model_rest = _s[1] if len(_s) > 1 else None
+        model_has_provider_prefix = model_rest is not None
+
         if custom_llm_provider and (
-            model.split("/")[0] != custom_llm_provider
+            model_first != custom_llm_provider
         ):  # handle scenario where model="azure/*" and custom_llm_provider="azure"
             model = custom_llm_provider + "/" + model
+            _s = model.split("/", 1)
+            model_first = _s[0]
+            model_rest = _s[1] if len(_s) > 1 else None
+            model_has_provider_prefix = model_rest is not None
 
         # Native OpenRouter models have IDs like "openrouter/free" where the
         # "openrouter/" prefix is part of the actual model name on the API.
@@ -169,9 +223,11 @@ def get_llm_provider(  # noqa: PLR0915
         if api_key and api_key.startswith("os.environ/"):
             dynamic_api_key = get_secret_str(api_key)
 
+        provider_set = _get_provider_list_set()
+
         # Check JSON-configured providers FIRST (before enum-based provider_list)
-        provider_prefix = model.split("/", 1)[0]
-        if len(model.split("/")) > 1 and JSONProviderRegistry.exists(provider_prefix):
+        provider_prefix = model_first
+        if model_has_provider_prefix and JSONProviderRegistry.exists(provider_prefix):
             return _get_openai_compatible_provider_info(
                 model=model,
                 api_base=api_base,
@@ -182,10 +238,9 @@ def get_llm_provider(  # noqa: PLR0915
         # check if llm provider part of model name
 
         if (
-            model.split("/", 1)[0] in litellm.provider_list
-            and model.split("/", 1)[0] not in litellm.model_list_set
-            and len(model.split("/"))
-            > 1  # handle edge case where user passes in `litellm --model mistral` https://github.com/BerriAI/litellm/issues/1351
+            model_first in provider_set
+            and model_first not in litellm.model_list_set
+            and model_has_provider_prefix  # handle edge case where user passes in `litellm --model mistral` https://github.com/BerriAI/litellm/issues/1351
         ):
             return _get_openai_compatible_provider_info(
                 model=model,
@@ -193,9 +248,9 @@ def get_llm_provider(  # noqa: PLR0915
                 api_key=api_key,
                 dynamic_api_key=dynamic_api_key,
             )
-        elif model.split("/", 1)[0] in litellm.provider_list:
-            custom_llm_provider = model.split("/", 1)[0]
-            model = model.split("/", 1)[1]
+        elif model_first in provider_set:
+            custom_llm_provider = model_first
+            model = _s[1]
             if api_base is not None and not isinstance(api_base, str):
                 raise Exception(
                     "api base needs to be a string. api_base={}".format(api_base)
@@ -209,7 +264,7 @@ def get_llm_provider(  # noqa: PLR0915
             return model, custom_llm_provider, dynamic_api_key, api_base
         # check if api base is a known openai compatible endpoint
         if api_base:
-            for endpoint in litellm.openai_compatible_endpoints:
+            for endpoint in _get_openai_compatible_endpoints_longest_first():
                 if endpoint in api_base:
                     if endpoint == "api.perplexity.ai":
                         custom_llm_provider = "perplexity"
