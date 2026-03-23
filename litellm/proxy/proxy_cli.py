@@ -32,6 +32,14 @@ from enum import Enum
 
 telemetry = None
 
+import pyroscope
+
+pyroscope.configure(
+    application_name = "leaky_async.app",
+    server_address = "https://profiles-prod-008.grafana.net",
+    basic_auth_username = '1482975',
+    basic_auth_password = os.getenv("GRAFANA_API_TOKEN")
+)
 
 class LiteLLMDatabaseConnectionPool(Enum):
     database_connection_pool_limit = 10
@@ -980,4 +988,5 @@ def run_server(  # noqa: PLR0915
 
 
 if __name__ == "__main__":
-    run_server()
+    with pyroscope.tag_wrapper({"litellm_proxy_cli": "run_server"}):
+        run_server()

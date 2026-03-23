@@ -7574,6 +7574,9 @@ class Router:
         model_list = self.get_model_list(model_name=model_group)
         if model_list is None:
             return None
+        # model_group is constant: compute once (was N calls inside the loop).
+        wildcard_route_match = self.pattern_router.route(model_group)
+        providers_seen: set[str] = set()
         for model in model_list:
             is_match = False
             if (
@@ -7581,8 +7584,7 @@ class Router:
             ):  # exact match
                 is_match = True
             elif (
-                "model_name" in model
-                and self.pattern_router.route(model_group) is not None
+                "model_name" in model and wildcard_route_match is not None
             ):  # wildcard model
                 is_match = True
 
@@ -7600,22 +7602,18 @@ class Router:
             model_info_dict = model.get("model_info", {})
 
             # get model tpm
-            _deployment_tpm: Optional[int] = None
+            _deployment_tpm: Optional[int] = model.get("tpm")  # type: ignore
             if _deployment_tpm is None:
-                _deployment_tpm = model.get("tpm", None)  # type: ignore
+                _deployment_tpm = model_litellm_params.get("tpm")  # type: ignore
             if _deployment_tpm is None:
-                _deployment_tpm = model_litellm_params.get("tpm", None)  # type: ignore
-            if _deployment_tpm is None:
-                _deployment_tpm = model_info_dict.get("tpm", None)  # type: ignore
+                _deployment_tpm = model_info_dict.get("tpm")  # type: ignore
 
             # get model rpm
-            _deployment_rpm: Optional[int] = None
+            _deployment_rpm: Optional[int] = model.get("rpm")  # type: ignore
             if _deployment_rpm is None:
-                _deployment_rpm = model.get("rpm", None)  # type: ignore
+                _deployment_rpm = model_litellm_params.get("rpm")  # type: ignore
             if _deployment_rpm is None:
-                _deployment_rpm = model_litellm_params.get("rpm", None)  # type: ignore
-            if _deployment_rpm is None:
-                _deployment_rpm = model_info_dict.get("rpm", None)  # type: ignore
+                _deployment_rpm = model_info_dict.get("rpm")  # type: ignore
 
             # get model info
             try:
@@ -7649,8 +7647,7 @@ class Router:
                     supported_openai_params = []
 
                 # Get mode from database model_info if available, otherwise default to "chat"
-                db_model_info = model.get("model_info", {})
-                mode = db_model_info.get("mode", "chat")
+                mode = model_info_dict.get("mode", "chat")
 
                 model_info = ModelMapInfo(
                     key=model_group,
@@ -7673,6 +7670,7 @@ class Router:
                         **model_info,
                     }
                 )
+                providers_seen.add(llm_provider)
             else:
                 # if max_input_tokens > curr
                 # if max_output_tokens > curr
@@ -7681,7 +7679,8 @@ class Router:
                 # supports_parallel_function_calling == True
                 # supports_vision == True
                 # supports_function_calling == True
-                if llm_provider not in model_group_info.providers:
+                if llm_provider not in providers_seen:
+                    providers_seen.add(llm_provider)
                     model_group_info.providers.append(llm_provider)
                 if (
                     model_info.get("max_input_tokens", None) is not None
