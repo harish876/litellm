@@ -30,7 +30,7 @@ We drive **`/v1/chat/completions`** with a **standalone loadtest script** (local
 
 **Note:** Earlier ad-hoc runs (e.g. different topology: **not** this Compose stack, **2 workers**, high `max_requests_before_restart`) showed **peak ~2.7–2.8 GB** total and **~1.0–1.1 GB RSS per worker** without an obvious unbounded leak on chat — kept for reference; the **primary** documented chat result here is the **GCP + loadtest** scenario above.
 
-- [Memray Leak Summary](memray-ifood-debug-base.html)
+- [Memray Leak Summary](https://github.com/harish876/litellm/blob/ifood-oom-debug/memray-ifood-debug-base.html)
 
 
 - Memray Allocation Summary
