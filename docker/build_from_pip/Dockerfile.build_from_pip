@@ -1,16 +1,24 @@
-FROM python:3.13-alpine
+FROM python:3.13-slim-bookworm
 
 WORKDIR /app
 
 ENV HOME=/home/litellm
 ENV PATH="${HOME}/venv/bin:$PATH"
 
-# Install runtime dependencies
-# Note: Using Python 3.13 for compatibility with ddtrace and other packages
-# rust and cargo are required for building ddtrace from source
-# musl-dev and libffi-dev are needed for some Python packages on Alpine
-RUN apk update && \
-    apk add --no-cache gcc musl-dev libffi-dev openssl openssl-dev rust cargo
+# Build deps for wheels / Prisma / cryptography; openssl for Prisma engine.
+# Use glibc (Debian) rather than Alpine (musl): litellm[proxy] pulls pyroscope-io,
+# which publishes manylinux wheels but not musllinux for the 0.8 line — on Alpine
+# pip falls back to sdist and the Rust build fails (missing ffikit paths).
+# procps: top, ps; gdb: memray attach (also needs cap SYS_PTRACE at runtime).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libffi-dev \
+    libssl-dev \
+    ca-certificates \
+    curl \
+    procps \
+    gdb \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN python -m venv ${HOME}/venv
 RUN ${HOME}/venv/bin/pip install --no-cache-dir --upgrade pip
@@ -18,6 +26,9 @@ RUN ${HOME}/venv/bin/pip install --no-cache-dir --upgrade pip
 COPY docker/build_from_pip/requirements.txt .
 RUN --mount=type=cache,target=${HOME}/.cache/pip \
     ${HOME}/venv/bin/pip install -r requirements.txt
+
+COPY docker/build_from_pip/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Copy Prisma schema file
 COPY schema.prisma .
@@ -27,5 +38,6 @@ RUN prisma generate
 
 EXPOSE 4000/tcp
 
-ENTRYPOINT ["litellm"]
+# Set USE_DDPROFILER=true to wrap with `ddtrace-run --profiling` (see entrypoint.sh).
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["--port", "4000"]
