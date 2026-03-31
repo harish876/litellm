@@ -750,6 +750,7 @@ async def get_file_content(  # noqa: PLR0915
                 f"Invalid response - response.response is None - got {response}"
             )
 
+        # We should do a Streaming Response. 65MB Files according to ifood's usage might cause OOM. We are still downloading this and buffering it in memory. TODO: Validate
         return Response(
             content=httpx_response.content,
             status_code=httpx_response.status_code,
