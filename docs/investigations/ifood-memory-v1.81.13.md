@@ -135,7 +135,7 @@ We drive **`/v1/chat/completions`** with a **standalone loadtest script** (local
 **Summary:**
 During batch file retrievals with large payloads, worker memory rises sharply and quickly approaches the container limit before worker recycling can occur, indicating that large file responses are being buffered in memory rather than streamed.
 
-OOM Error is not reached but container memory usage reaches peak 98 - 99%. Payload sizes of 65MB used with 10,000 requests in parallel, according to the batch_lt.py script provided
+**OOM Error is not reached** but container memory usage reaches peak 98 - 99%. Payload sizes of 65MB used with 10,000 requests in parallel, according to the batch_lt.py script provided
 
 Code Path (file_endpoints.py, line 716):
 ```
@@ -149,9 +149,17 @@ Code Path (file_endpoints.py, line 716):
 ``` 
 
 **Steps**
-- Ran **LiteLLM with 1 worker** and **without** `max_requests_before_restart` interfering during capture (or set it very high).
+- Ran **LiteLLM with 2 worker** and **with** `max_requests_before_restart`.
 - Use **memray** (e.g. leak mode / `--leaks`) on the **files** path.
 - **Mocked** file upstream / route so we can send a **~65 MB** payload through the proxy without relying on real provider keys, then attribute memory.
+
+
+**Potential Resolution**
+Without changing the current business logic, the potential fix could be:
+
+ - Limitation of the openai SDK which returns BinaryResponse, instead of a streamed response.
+ - We can wrap this API with a StreamingResponse handler, so that this can be mitigated. Again all signs point to this code path in the flamegraph as well.
+ - Needs to be profiled after fix and before release.
 
 **Data**
 
