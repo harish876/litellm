@@ -217,16 +217,3 @@ c7505b5263d1   litellm-litellm-1   29.78%    3.893GiB / 4GiB     97.32%    252GB
 ```
 ---
 
-## References (repo / ops)
-
-- `litellm/proxy/proxy_cli.py` — `--max_requests_before_restart` (uvicorn `limit_max_requests` / gunicorn `max_requests`); no built-in time-based recycle.
-- `docker/build_from_pip/` — optional **memray**, **procps**, **gdb**; Datadog profiler notes (**Python 3.12** vs **3.13** for `ddtrace-run --profiling`).
-
----
-
-## Changelog
-
-- Restructured into **§1 chat** (standalone loadtest, 3 KB / 10 RPS / 30 min, CPU screenshots TBD) and **§2 files** (pending).
-- Added **GCP + Docker Compose** setup context (4 vCPU / 4 GB, remote client, Postgres, Redis, Prometheus, Datadog, mock LLM).
-
-
