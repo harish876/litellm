@@ -132,16 +132,89 @@ We drive **`/v1/chat/completions`** with a **standalone loadtest script** (local
 
 ## 2. `/v1/files` (and related file routes)
 
-**Status: not started** for the same style of leak / CPU investigation.
+**Summary:**
+During batch file retrievals with large payloads, worker memory rises sharply and quickly approaches the container limit before worker recycling can occur, indicating that large file responses are being buffered in memory rather than streamed.
 
-**Planned work:**
+OOM Error is not reached but container memory usage reaches peak 98 - 99%. Payload sizes of 65MB used with 10,000 requests in parallel, according to the batch_lt.py script provided
 
-- Run **LiteLLM with 1 worker** and **without** `max_requests_before_restart` interfering during capture (or set it very high).
+Code Path (file_endpoints.py, line 716):
+```
+                response = await litellm.afile_content(
+                    **{
+                        "custom_llm_provider": custom_llm_provider,
+                        "file_id": file_id,
+                        **data,
+                    }  # type: ignore
+                )
+``` 
+
+**Steps**
+- Ran **LiteLLM with 1 worker** and **without** `max_requests_before_restart` interfering during capture (or set it very high).
 - Use **memray** (e.g. leak mode / `--leaks`) on the **files** path.
-- **Mock** file upstream / route so we can send a **~65 MB** payload through the proxy without relying on real provider keys, then attribute memory.
+- **Mocked** file upstream / route so we can send a **~65 MB** payload through the proxy without relying on real provider keys, then attribute memory.
 
-**Batch endpoint:** same methodology **after** files, if needed.
+**Data**
 
+- [Memray Leak Summary](https://github.com/harish876/litellm/blob/ifood-oom-debug/memray-ifood-batch.html)
+
+Container Memory Usage Graph (Workers Reach peak memory before uvicorn can restart)
+<img alt="worker_memory" src="./images/ifood-worker_process_mem_usage_batch.png" />
+
+Container Memory Consumption
+
+```
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   34.76%    3.335GiB / 4GiB     83.37%    201GB / 201GB   269MB / 400MB   80
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   37.94%    3.58GiB / 4GiB      89.50%    206GB / 206GB   269MB / 400MB   83
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   8.29%     3.512GiB / 4GiB     87.81%    206GB / 206GB   269MB / 400MB   83
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   41.50%    3.656GiB / 4GiB     91.39%    214GB / 215GB   269MB / 400MB   83
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   14.97%    3.781GiB / 4GiB     94.52%    214GB / 215GB   269MB / 400MB   83
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   3.68%     3.495GiB / 4GiB     87.37%    236GB / 236GB   318MB / 400MB   82
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   62.47%    3.69GiB / 4GiB      92.24%    236GB / 237GB   318MB / 400MB   82
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   29.04%    3.687GiB / 4GiB     92.18%    240GB / 241GB   318MB / 400MB   82
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   35.19%    3.883GiB / 4GiB     97.08%    243GB / 244GB   318MB / 400MB   82
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   11.32%    3.819GiB / 4GiB     95.47%    243GB / 244GB   318MB / 400MB   82
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   13.22%    3.685GiB / 4GiB     92.12%    244GB / 244GB   318MB / 400MB   82
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   3.89%     3.822GiB / 4GiB     95.54%    244GB / 245GB   318MB / 400MB   82
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   46.25%    3.822GiB / 4GiB     95.54%    244GB / 245GB   318MB / 400MB   82
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   15.11%    3.768GiB / 4GiB     94.19%    246GB / 247GB   319MB / 400MB   82
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   17.94%    3.822GiB / 4GiB     95.54%    246GB / 247GB   319MB / 400MB   82
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   17.71%    3.766GiB / 4GiB     94.15%    251GB / 252GB   319MB / 400MB   82
+khgokul@instance-20260329-212319:~/litellm-ifood-debug/litellm$ docker stats litellm-litellm-1 --no-stream
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O       PIDS
+c7505b5263d1   litellm-litellm-1   29.78%    3.893GiB / 4GiB     97.32%    252GB / 252GB   319MB / 400MB   82
+```
 ---
 
 ## References (repo / ops)

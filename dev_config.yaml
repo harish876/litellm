@@ -20,6 +20,8 @@ model_list:
 general_settings:
   master_key: sk-1234
   health_check_details: False
+  # disable_spend_updates: True
+  # use_redis_transaction_buffer: True
 
 files_settings:
   - custom_llm_provider: azure

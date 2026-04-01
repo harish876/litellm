@@ -1,6 +1,6 @@
 services:
   litellm:
-    image: litellm-from-pip:1.81.13
+    image: litellm-from-local:1.81.13
     volumes:
       - ./dev_config.yaml:/app/config.yaml
     command:
@@ -10,10 +10,10 @@ services:
       - "/app/config.yaml"
       - "--port"
       - "4000"
-      # - "--num_workers"
-      # - "${LITELLM_WORKERS:-2}"
-      # - "--max_requests_before_restart"
-      # - "${LITELLM_REQS_RESTART:-20000}"
+      - "--num_workers"
+      - "${LITELLM_WORKERS:-2}"
+      - "--max_requests_before_restart"
+      - "${LITELLM_REQS_RESTART:-20000}"
     ports:
       - "4000:4000" # Map the container port to the host, change the host port if necessary
     environment:
@@ -38,6 +38,7 @@ services:
       - redis
       - datadog-agent # APM trace intake on :8126
       - mock-llm-provider # OpenAI-compatible mock at http://mock-llm-provider/llm/
+      - mock-files-api # OpenAI-compatible files mock at http://mock-files-api:8001/v1/
     # Required for `memray attach` inside the container (https://bloomberg.github.io/memray/attach.html)
     cap_add:
       - SYS_PTRACE
@@ -66,6 +67,14 @@ services:
       POSTGRES_DB: litellm
       POSTGRES_USER: llmproxy
       POSTGRES_PASSWORD: dbpassword9090
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - pg_stat_statements.max=10000
     ports:
       - "5432:5432"
     volumes:
@@ -97,6 +106,28 @@ services:
     ports:
       - "8090:80"
     restart: unless-stopped
+
+  # OpenAI-compatible files mock. Same network as litellm: use http://mock-files-api:8001/v1/
+  mock-files-api:
+    image: python:3.11-slim
+    container_name: mock-files-api
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command:
+      - /bin/sh
+      - -c
+      - pip install --no-cache-dir fastapi uvicorn && uvicorn mock_files_api:app --host 0.0.0.0 --port 8001
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   prometheus:
     image: prom/prometheus

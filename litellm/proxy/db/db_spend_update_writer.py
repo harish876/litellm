@@ -74,6 +74,7 @@ class DBSpendUpdateWriter:
         self.daily_org_spend_update_queue = DailySpendUpdateQueue()
         self.daily_tag_spend_update_queue = DailySpendUpdateQueue()
 
+    #Harish-TODO
     async def update_database(
         # LiteLLM management object fields
         self,
@@ -101,6 +102,7 @@ class DBSpendUpdateWriter:
             verbose_proxy_logger.debug(
                 f"Enters prisma db call, response_cost: {response_cost}, token: {token}; user_id: {user_id}; team_id: {team_id}"
             )
+            #Harish-TODO
             if ProxyUpdateSpend.disable_spend_updates() is True:
                 return
             if token is not None and isinstance(token, str) and token.startswith("sk-"):
@@ -215,6 +217,7 @@ class DBSpendUpdateWriter:
                     prisma_client=prisma_client,
                 )
             )
+            #Harish-TODO
             asyncio.create_task(
                 self.add_spend_log_transaction_to_daily_tag_transaction(
                     payload=copy.deepcopy(payload),
@@ -589,6 +592,7 @@ class DBSpendUpdateWriter:
                     cronjob_id=DB_SPEND_UPDATE_JOB_NAME,
                 )
 
+    #Harish-TODO
     async def _commit_spend_updates_to_db_without_redis_buffer(
         self,
         prisma_client: PrismaClient,
@@ -659,6 +663,7 @@ class DBSpendUpdateWriter:
 
         ################## Daily Tag Spend Update Transactions ##################
         # Aggregate all in memory daily tag spend transactions and commit to db
+        #Harish-TODO
         daily_tag_spend_update_transactions = cast(
             Dict[str, DailyTagSpendTransaction],
             await self.daily_tag_spend_update_queue.flush_and_get_aggregated_daily_spend_update_transactions(),
@@ -1126,6 +1131,7 @@ class DBSpendUpdateWriter:
         ...
     # fmt: on
 
+    #Harish-TODO
     @staticmethod
     async def _update_daily_spend(
         n_retry_times: int,
@@ -1152,7 +1158,7 @@ class DBSpendUpdateWriter:
         verbose_proxy_logger.debug(
             f"Daily {entity_type.capitalize()} Spend transactions: {len(daily_spend_transactions)}"
         )
-        BATCH_SIZE = 100
+        BATCH_SIZE = 100        
         start_time = time.time()
 
         try:
@@ -1451,6 +1457,7 @@ class DBSpendUpdateWriter:
             unique_constraint_name="agent_id_date_api_key_model_custom_llm_provider_mcp_namespaced_tool_name_endpoint",
         )
 
+    #Harish-TODO
     @staticmethod
     async def update_daily_tag_spend(
         n_retry_times: int,
@@ -1784,13 +1791,29 @@ class DBSpendUpdateWriter:
             request_tags = payload["request_tags"]
         else:
             raise ValueError(f"Invalid request_tags: {payload['request_tags']}")
-        for tag in request_tags:
-            endpoint_str = base_daily_transaction.get("endpoint") or ""
-            daily_transaction_key = f"{tag}_{base_daily_transaction['date']}_{payload['api_key']}_{payload['model']}_{payload['custom_llm_provider']}_{endpoint_str}"
-            daily_transaction = DailyTagSpendTransaction(
-                tag=tag, **base_daily_transaction, request_id=payload["request_id"]
-            )
+        
+        if len(request_tags) == 0:
+            return
 
-            await self.daily_tag_spend_update_queue.add_update(
-                update={daily_transaction_key: daily_transaction}
-            )
+        tag = request_tags[0]
+        endpoint_str = base_daily_transaction.get("endpoint") or ""
+        daily_transaction_key = f"{tag}_{base_daily_transaction['date']}_{payload['api_key']}_{payload['model']}_{payload['custom_llm_provider']}_{endpoint_str}"
+        daily_transaction = DailyTagSpendTransaction(
+            tag=tag, **base_daily_transaction, request_id=payload["request_id"]
+        )
+
+        await self.daily_tag_spend_update_queue.add_update(
+            update={daily_transaction_key: daily_transaction}
+        )
+
+        # Original behavior kept for reference:
+        # for tag in request_tags:
+        #     endpoint_str = base_daily_transaction.get("endpoint") or ""
+        #     daily_transaction_key = f"{tag}_{base_daily_transaction['date']}_{payload['api_key']}_{payload['model']}_{payload['custom_llm_provider']}_{endpoint_str}"
+        #     daily_transaction = DailyTagSpendTransaction(
+        #         tag=tag, **base_daily_transaction, request_id=payload["request_id"]
+        #     )
+        
+        #     await self.daily_tag_spend_update_queue.add_update(
+        #         update={daily_transaction_key: daily_transaction}
+        #     )
