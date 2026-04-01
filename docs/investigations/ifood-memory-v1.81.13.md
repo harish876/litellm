@@ -25,10 +25,10 @@ We drive **`/v1/chat/completions`** with a **standalone loadtest script** (local
 
 | Result | Detail |
 |--------|--------|
-| **Leak check (bounded run)** | **No leaks observed** for payload sizes **up to ~3 KB per request**, at **10 RPS**, for **30 minutes**. |
+| **Leak check (bounded run)** | **leaks observed** for payload sizes **up to ~3 KB per request**, at **10 RPS**, for **30 minutes**. |
 | **CPU** | **No clear CPU spike** observed in this run; **screenshots / graphs will be attached here** when available. |
 
-**Note:** Earlier ad-hoc runs (e.g. different topology: **not** this Compose stack, **2 workers**, high `max_requests_before_restart`) showed **peak ~2.7–2.8 GB** total and **~1.0–1.1 GB RSS per worker** without an obvious unbounded leak on chat — kept for reference; the **primary** documented chat result here is the **GCP + loadtest** scenario above.
+**Summary**: There are leaks, heap memory does grow, but only when we dont restart the workers. Find the flamegraph with the leaky functions. These may / may not be leaky but these show up when running memray using the --leaks flag.
 
 - [Memray Leak Summary](https://github.com/harish876/litellm/blob/ifood-oom-debug/memray-ifood-debug-base.html)
 
