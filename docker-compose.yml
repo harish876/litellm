@@ -1,26 +1,55 @@
 services:
   litellm:
-    build:
-      context: .
-      args:
-        target: runtime
-    image: docker.litellm.ai/berriai/litellm:main-stable
-    #########################################
-    ## Uncomment these lines to start proxy with a config.yaml file ##
-    # volumes:
-    #  - ./config.yaml:/app/config.yaml
-    # command:
-    #  - "--config=/app/config.yaml"
-    ##############################################
+    image: litellm-from-pip:1.81.13
+    volumes:
+      - ./dev_config.yaml:/app/config.yaml
+    command:
+      - "--host"
+      - "0.0.0.0"
+      - "--config"
+      - "/app/config.yaml"
+      - "--port"
+      - "4000"
+      - "--num_workers"
+      - "${LITELLM_WORKERS:-2}"
+      - "--max_requests_before_restart"
+      - "${LITELLM_REQS_RESTART:-20000}"
     ports:
       - "4000:4000" # Map the container port to the host, change the host port if necessary
     environment:
       DATABASE_URL: "postgresql://llmproxy:dbpassword9090@db:5432/litellm"
       STORE_MODEL_IN_DB: "True" # allows adding models to proxy via UI
+      ENV: production
+      LITELLM_ENVIRONMENT: production
+      # ddtrace sends traces here (not localhost). Requires `datadog-agent` service below.
+      DD_AGENT_HOST: datadog-agent
+      DD_TRACE_AGENT_PORT: "8126"
+      # Redis (see `redis` service). Override in `.env` if needed.
+      REDIS_URL: "redis://redis:6379"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # Used by dev_config.yaml cache + router_settings (same Compose `redis` service)
+      RATELIMIT_REDIS_ENDPOINT: redis
+      RATELIMIT_REDIS_PORT: "6379"
     env_file:
-      - .env # Load local .env file
+      - .env # Load local .env (secrets; values below override when duplicated)
     depends_on:
-      - db  # Indicates that this service depends on the 'db' service, ensuring 'db' starts first
+      - db # DB must start before the proxy
+      - redis
+      - datadog-agent # APM trace intake on :8126
+      - mock-llm-provider # OpenAI-compatible mock at http://mock-llm-provider/llm/
+      - mock-files-api # OpenAI-compatible files mock at http://mock-files-api:8001/v1/
+    # Required for `memray attach` inside the container (https://bloomberg.github.io/memray/attach.html)
+    cap_add:
+      - SYS_PTRACE
+    deploy:
+      resources:
+        reservations:
+          cpus: "4"
+          memory: 4G
+        limits:
+          cpus: "4"
+          memory: 4G
     healthcheck:  # Defines the health check configuration for the container
       test:
         - CMD-SHELL
@@ -38,6 +67,14 @@ services:
       POSTGRES_DB: litellm
       POSTGRES_USER: llmproxy
       POSTGRES_PASSWORD: dbpassword9090
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - pg_stat_statements.max=10000
     ports:
       - "5432:5432"
     volumes:
@@ -46,6 +83,50 @@ services:
       test: ["CMD-SHELL", "pg_isready -d litellm -U llmproxy"]
       interval: 1s
       timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: litellm_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  # OpenAI-compatible mock LLM (https://httpbun.com — /llm). Same network as litellm: use http://mock-llm-provider/llm/
+  mock-llm-provider:
+    image: sharat87/httpbun:latest
+    container_name: mock-llm-provider
+    ports:
+      - "8090:80"
+    restart: unless-stopped
+
+  # OpenAI-compatible files mock. Same network as litellm: use http://mock-files-api:8001/v1/
+  mock-files-api:
+    image: python:3.11-slim
+    container_name: mock-files-api
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command:
+      - /bin/sh
+      - -c
+      - pip install --no-cache-dir fastapi uvicorn && uvicorn mock_files_api:app --host 0.0.0.0 --port 8001
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"
+      interval: 5s
+      timeout: 3s
       retries: 10
 
   prometheus:
@@ -61,8 +142,28 @@ services:
       - "--storage.tsdb.retention.time=15d"
     restart: always
 
+  datadog-agent:
+    image: registry.datadoghq.com/agent:7
+    container_name: datadog-agent
+    pid: host
+    environment:
+      DD_API_KEY: ${DD_API_KEY:?set DD_API_KEY in .env}
+      DD_SITE: ${DD_SITE:-datadoghq.com}
+      DD_APM_ENABLED: "true"
+      DD_APM_NON_LOCAL_TRAFFIC: "true"
+      DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"
+    ports:
+      - "8126:8126"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+    restart: unless-stopped
+
 volumes:
   prometheus_data:
     driver: local
   postgres_data:
     name: litellm_postgres_data # Named volume for Postgres data persistence
+  redis_data:
+    name: litellm_redis_data
