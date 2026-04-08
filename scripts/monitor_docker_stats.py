@@ -136,6 +136,26 @@ def write_csv(samples: List[Sample], path: str) -> None:
             )
 
 
+def read_csv_samples(path: str) -> List[Sample]:
+    samples: List[Sample] = []
+    with open(path, "r", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            timestamp = dt.datetime.fromisoformat(row["timestamp"])
+            elapsed_s = float(row["elapsed_seconds"])
+            cpu_percent = float(row["cpu_percent"])
+            mem_used_gib = float(row["mem_used_gib"])
+            samples.append(
+                Sample(
+                    timestamp=timestamp,
+                    elapsed_s=elapsed_s,
+                    cpu_percent=cpu_percent,
+                    mem_used_bytes=mem_used_gib * (1024**3),
+                )
+            )
+    return samples
+
+
 def plot_memory(samples: List[Sample], output_path: str) -> None:
     try:
         import matplotlib.pyplot as plt
@@ -204,6 +224,12 @@ def main() -> int:
         default=None,
         help="Optional PNG path for memory-vs-time plot",
     )
+    parser.add_argument(
+        "--from-csv",
+        type=str,
+        default=None,
+        help="Use existing CSV samples instead of live docker sampling",
+    )
     args = parser.parse_args()
 
     if args.interval <= 0:
@@ -212,6 +238,25 @@ def main() -> int:
 
     if args.duration is None:
         print("Running until Ctrl+C. Use --duration for automatic stop.")
+
+    if args.from_csv:
+        samples = read_csv_samples(args.from_csv)
+        if not samples:
+            print("No valid samples found in CSV.", file=sys.stderr)
+            return 1
+
+        summary = summarize(samples)
+        print_summary(summary)
+
+        if args.plot:
+            try:
+                plot_memory(samples, args.plot)
+                print(f"Wrote memory plot: {args.plot}")
+            except Exception as e:
+                print(f"Failed to generate plot: {e}", file=sys.stderr)
+                return 1
+
+        return 0
 
     samples: List[Sample] = []
     start_monotonic = time.monotonic()
