@@ -38,6 +38,33 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/v1/files/{file_id}")
+@app.get("/openai/v1/files/{file_id}")
+@app.get("/openai/files/{file_id}")
+async def get_file(file_id: str) -> dict[str, int | str]:
+    size_mb = _resolve_size_mb(file_id)
+    if size_mb is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": f"unknown file_id '{file_id}'",
+                "available_file_ids": list(FILE_SIZES_MB.keys()),
+                "accepted_pattern": "test-file-{size_mb}",
+            },
+        )
+
+    size_bytes = size_mb * 1024 * 1024
+    return {
+        "id": file_id,
+        "object": "file",
+        "bytes": size_bytes,
+        "created_at": 1677610602,
+        "expires_at": 1677614202,
+        "filename": file_id,
+        "purpose": "fine-tune",
+    }
+
+
 @app.get("/v1/files/{file_id}/content")
 @app.get("/openai/v1/files/{file_id}/content")
 @app.get("/openai/files/{file_id}/content")

@@ -1920,6 +1920,7 @@ def completion(  # type: ignore # noqa: PLR0915
                 )
 
             # Check if this is a Claude model - route to Azure Anthropic handler
+            #TODO: Harish Timeout error check
             elif "claude" in model.lower():
                 # Use Azure Anthropic handler for Claude models
                 api_base = AzureFoundryModelInfo.get_api_base(api_base)

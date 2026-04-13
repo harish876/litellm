@@ -34,7 +34,7 @@ services:
       RATELIMIT_REDIS_PORT: "6379"
       # Force container-to-container mock endpoints (do not use localhost inside containers)
       OPENAI_BASE_URL: "http://mock-files-api:8001/v1"
-      AZURE_API_BASE: "http://mock-files-api:8001"
+      AZURE_API_BASE: "http://mock-files-api:8001/v1"
       AZURE_API_VERSION: "v1"
     env_file:
       - .env # Load local .env (secrets; values below override when duplicated)
@@ -63,6 +63,66 @@ services:
       timeout: 10s   # Health check command times out after 10 seconds
       retries: 3     # Retry up to 3 times if health check fails
       start_period: 40s  # Wait 40 seconds after container start before beginning health checks
+
+  # litellm-base:
+  #   image: litellm-from-pip:latest
+  #   volumes:
+  #     - ./dev_config.yaml:/app/config.yaml
+  #   command:
+  #     - "--host"
+  #     - "0.0.0.0"
+  #     - "--config"
+  #     - "/app/config.yaml"
+  #     - "--port"
+  #     - "4001"
+  #     - "--num_workers"
+  #     - "${LITELLM_WORKERS:-2}"
+  #     - "--max_requests_before_restart"
+  #     - "${LITELLM_REQS_RESTART:-20000}"
+  #   ports:
+  #     - "4001:4001"
+  #   environment:
+  #     DATABASE_URL: "postgresql://llmproxy:dbpassword9090@db:5432/litellm"
+  #     STORE_MODEL_IN_DB: "True"
+  #     ENV: production
+  #     LITELLM_ENVIRONMENT: production
+  #     DD_AGENT_HOST: datadog-agent
+  #     DD_TRACE_AGENT_PORT: "8126"
+  #     REDIS_URL: "redis://redis:6379"
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: "6379"
+  #     RATELIMIT_REDIS_ENDPOINT: redis
+  #     RATELIMIT_REDIS_PORT: "6379"
+  #     # OPENAI_BASE_URL: "http://mock-files-api:8001/v1"
+  #     OPENAI_BASE_URL: "https://api.openai.com/v1/"
+  #     AZURE_API_BASE: "https://api.openai.com/v1/"
+  #     AZURE_API_VERSION: "v1"
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     - db
+  #     - redis
+  #     - datadog-agent
+  #     - mock-llm-provider
+  #     - mock-files-api
+  #   cap_add:
+  #     - SYS_PTRACE
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         cpus: "4"
+  #         memory: 4G
+  #       limits:
+  #         cpus: "4"
+  #         memory: 4G
+  #   healthcheck:
+  #     test:
+  #       - CMD-SHELL
+  #       - python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:4001/health/liveliness')"
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 40s
 
   db:
     image: postgres:16

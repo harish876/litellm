@@ -9,6 +9,14 @@ model_list:
       model: openai/fake-model
       api_key: fake-key
       api_base: https://exampleopenaiendpoint-production.up.railway.app/
+      timeout: 40
+
+  - model_name: fake-openai-gpt4
+    litellm_params:
+      model: gpt-4
+      api_key: fake-key
+      # Docker Compose service `mock-llm-provider` (host:8090). Requires network_mock: False for real HTTP.
+      api_base: http://mock-llm-provider/llm/
 
   - model_name: fake-openai-gpt4
     litellm_params:
@@ -35,15 +43,16 @@ litellm_settings:
   # Redis-backed cache (Compose service `redis`; env RATELIMIT_* in docker-compose.yml)
   cache: True
   cache_params:
-    type: "redis"
-    host: os.environ/RATELIMIT_REDIS_ENDPOINT
-    port: os.environ/RATELIMIT_REDIS_PORT
-    # Uncomment when Redis requires AUTH (set `REDIS_DEFAULT_PASSWORD` in `.env`):
-    # password: os.environ/REDIS_DEFAULT_PASSWORD
-    mode: "default_off"
-    ttl: 60
-    max_connections: 500
-    supported_call_types: [] # cache opt-in; Redis still used for router / rate limits when configured
+    type: "local"
+    # type: "redis"
+    # host: os.environ/RATELIMIT_REDIS_ENDPOINT
+    # port: os.environ/RATELIMIT_REDIS_PORT
+    # # Uncomment when Redis requires AUTH (set `REDIS_DEFAULT_PASSWORD` in `.env`):
+    # # password: os.environ/REDIS_DEFAULT_PASSWORD
+    # mode: "default_off"
+    # ttl: 60
+    # max_connections: 500
+    # supported_call_types: [] # cache opt-in; Redis still used for router / rate limits when configured
 
 # Router Redis (same Compose Redis). Omit redis_password in `.env` if Redis has no auth.
 router_settings:
