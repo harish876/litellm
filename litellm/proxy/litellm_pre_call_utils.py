@@ -891,7 +891,7 @@ class LiteLLMProxyRequestSetup:
 
         return tags
 
-
+# TODO: Perf Lookup: Optimize
 async def add_litellm_data_to_request(  # noqa: PLR0915
     data: dict,
     request: Request,

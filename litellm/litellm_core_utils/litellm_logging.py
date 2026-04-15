@@ -2465,7 +2465,7 @@ class Logging(LiteLLMLoggingBaseClass):
                     str(e)
                 ),
             )
-
+    #TODO: Perf Lookup - Optimize
     async def async_success_handler(  # noqa: PLR0915
         self, result=None, start_time=None, end_time=None, cache_hit=None, **kwargs
     ):
@@ -4924,6 +4924,7 @@ class StandardLoggingPayloadSetup:
             )
         else:
             try:
+                #TODO: Perf Lookup: Optimize
                 _model_cost_information = litellm.get_model_info(
                     model=model_cost_name,
                     custom_llm_provider=custom_llm_provider,
@@ -5442,6 +5443,7 @@ def get_standard_logging_object_payload(
         base_model = _get_base_model_from_metadata(model_call_details=kwargs)
         custom_pricing = use_custom_pricing_for_model(litellm_params=litellm_params)
 
+        #TODO: Perf Lookup: Optimize
         model_cost_information = StandardLoggingPayloadSetup.get_model_cost_information(
             base_model=base_model,
             custom_pricing=custom_pricing,

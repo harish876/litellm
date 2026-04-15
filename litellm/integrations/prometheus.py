@@ -3457,7 +3457,7 @@ class PrometheusLogger(CustomLogger):
             "Starting Prometheus Metrics on /metrics (no authentication)"
         )
 
-
+#TODO: Optimize
 def prometheus_label_factory(
     supported_enum_labels: List[str],
     enum_values: UserAPIKeyLabelValues,

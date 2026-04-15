@@ -126,6 +126,7 @@ REALTIME_REQUEST_SCOPE_TEMPLATE: Dict[str, Any] = {
     "path": "/v1/realtime",
 }
 
+import pyroscope
 
 def showwarning(message, category, filename, lineno, file=None, line=None):
     traceback_info = f"{filename}:{lineno}: {category.__name__}: {message}\n"
@@ -7107,144 +7108,145 @@ async def chat_completion(  # noqa: PLR0915
     ```
 
     """
-    global general_settings, user_debug, proxy_logging_obj, llm_model_list
-    global user_temperature, user_request_timeout, user_max_tokens, user_api_base
-    data = await _read_request_body(request=request)
-    if user_api_key_dict is not None:
-        if data.get("metadata") is None:
-            data["metadata"] = {}
-        if (
-            hasattr(user_api_key_dict, "user_id")
-            and user_api_key_dict.user_id is not None
-        ):
-            data["metadata"]["user_api_key_user_id"] = user_api_key_dict.user_id
-        if (
-            hasattr(user_api_key_dict, "team_id")
-            and user_api_key_dict.team_id is not None
-        ):
-            data["metadata"]["user_api_key_team_id"] = user_api_key_dict.team_id
-        if (
-            hasattr(user_api_key_dict, "org_id")
-            and user_api_key_dict.org_id is not None
-        ):
-            data["metadata"]["user_api_key_org_id"] = user_api_key_dict.org_id
-        if (
-            hasattr(user_api_key_dict, "organization_alias")
-            and user_api_key_dict.organization_alias is not None
-        ):
-            data["metadata"]["user_api_key_org_alias"] = (
-                user_api_key_dict.organization_alias
-            )
-        if (
-            hasattr(user_api_key_dict, "agent_id")
-            and user_api_key_dict.agent_id is not None
-        ):
-            data["metadata"]["agent_id"] = user_api_key_dict.agent_id
-    base_llm_response_processor = ProxyBaseLLMRequestProcessing(data=data)
-    try:
-        result = await base_llm_response_processor.base_process_llm_request(
-            request=request,
-            fastapi_response=fastapi_response,
-            user_api_key_dict=user_api_key_dict,
-            route_type="acompletion",
-            proxy_logging_obj=proxy_logging_obj,
-            llm_router=llm_router,
-            general_settings=general_settings,
-            proxy_config=proxy_config,
-            select_data_generator=select_data_generator,
-            model=model,
-            user_model=user_model,
-            user_temperature=user_temperature,
-            user_request_timeout=user_request_timeout,
-            user_max_tokens=user_max_tokens,
-            user_api_base=user_api_base,
-            version=version,
-        )
-        if isinstance(result, BaseModel):
-            return model_dump_with_preserved_fields(result, exclude_unset=True)
-        else:
-            return result
-    except ModifyResponseException as e:
-        # Guardrail flagged content in passthrough mode - return 200 with violation message
-        _data = e.request_data
-        await proxy_logging_obj.post_call_failure_hook(
-            user_api_key_dict=user_api_key_dict,
-            original_exception=e,
-            request_data=_data,
-        )
-        _chat_response = litellm.ModelResponse()
-        _chat_response.model = e.model  # type: ignore
-        _chat_response.choices[0].message.content = e.message  # type: ignore
-        _chat_response.choices[0].finish_reason = "content_filter"  # type: ignore
-
-        if data.get("stream", None) is not None and data["stream"] is True:
-            _iterator = litellm.utils.ModelResponseIterator(
-                model_response=_chat_response, convert_to_delta=True
-            )
-            _streaming_response = litellm.CustomStreamWrapper(
-                completion_stream=_iterator,
-                model=e.model,
-                custom_llm_provider="cached_response",
-                logging_obj=data.get("litellm_logging_obj", None),
-            )
-            selected_data_generator = select_data_generator(
-                response=_streaming_response,
+    with pyroscope.tag_wrapper({"litellm_proxy_server": "chat_completion"}):
+        global general_settings, user_debug, proxy_logging_obj, llm_model_list
+        global user_temperature, user_request_timeout, user_max_tokens, user_api_base
+        data = await _read_request_body(request=request)
+        if user_api_key_dict is not None:
+            if data.get("metadata") is None:
+                data["metadata"] = {}
+            if (
+                hasattr(user_api_key_dict, "user_id")
+                and user_api_key_dict.user_id is not None
+            ):
+                data["metadata"]["user_api_key_user_id"] = user_api_key_dict.user_id
+            if (
+                hasattr(user_api_key_dict, "team_id")
+                and user_api_key_dict.team_id is not None
+            ):
+                data["metadata"]["user_api_key_team_id"] = user_api_key_dict.team_id
+            if (
+                hasattr(user_api_key_dict, "org_id")
+                and user_api_key_dict.org_id is not None
+            ):
+                data["metadata"]["user_api_key_org_id"] = user_api_key_dict.org_id
+            if (
+                hasattr(user_api_key_dict, "organization_alias")
+                and user_api_key_dict.organization_alias is not None
+            ):
+                data["metadata"]["user_api_key_org_alias"] = (
+                    user_api_key_dict.organization_alias
+                )
+            if (
+                hasattr(user_api_key_dict, "agent_id")
+                and user_api_key_dict.agent_id is not None
+            ):
+                data["metadata"]["agent_id"] = user_api_key_dict.agent_id
+        base_llm_response_processor = ProxyBaseLLMRequestProcessing(data=data)
+        try:
+            result = await base_llm_response_processor.base_process_llm_request(
+                request=request,
+                fastapi_response=fastapi_response,
                 user_api_key_dict=user_api_key_dict,
+                route_type="acompletion",
+                proxy_logging_obj=proxy_logging_obj,
+                llm_router=llm_router,
+                general_settings=general_settings,
+                proxy_config=proxy_config,
+                select_data_generator=select_data_generator,
+                model=model,
+                user_model=user_model,
+                user_temperature=user_temperature,
+                user_request_timeout=user_request_timeout,
+                user_max_tokens=user_max_tokens,
+                user_api_base=user_api_base,
+                version=version,
+            )
+            if isinstance(result, BaseModel):
+                return model_dump_with_preserved_fields(result, exclude_unset=True)
+            else:
+                return result
+        except ModifyResponseException as e:
+            # Guardrail flagged content in passthrough mode - return 200 with violation message
+            _data = e.request_data
+            await proxy_logging_obj.post_call_failure_hook(
+                user_api_key_dict=user_api_key_dict,
+                original_exception=e,
                 request_data=_data,
             )
+            _chat_response = litellm.ModelResponse()
+            _chat_response.model = e.model  # type: ignore
+            _chat_response.choices[0].message.content = e.message  # type: ignore
+            _chat_response.choices[0].finish_reason = "content_filter"  # type: ignore
 
-            return StreamingResponse(
-                selected_data_generator,
-                media_type="text/event-stream",
-                status_code=200,  # Return 200 for passthrough mode
-            )
-        _usage = litellm.Usage(prompt_tokens=0, completion_tokens=0, total_tokens=0)
-        _chat_response.usage = _usage  # type: ignore
-        return _chat_response
-    except RejectedRequestError as e:
-        _data = e.request_data
-        await proxy_logging_obj.post_call_failure_hook(
-            user_api_key_dict=user_api_key_dict,
-            original_exception=e,
-            request_data=_data,
-        )
-        _chat_response = litellm.ModelResponse()
-        _chat_response.choices[0].message.content = e.message  # type: ignore
+            if data.get("stream", None) is not None and data["stream"] is True:
+                _iterator = litellm.utils.ModelResponseIterator(
+                    model_response=_chat_response, convert_to_delta=True
+                )
+                _streaming_response = litellm.CustomStreamWrapper(
+                    completion_stream=_iterator,
+                    model=e.model,
+                    custom_llm_provider="cached_response",
+                    logging_obj=data.get("litellm_logging_obj", None),
+                )
+                selected_data_generator = select_data_generator(
+                    response=_streaming_response,
+                    user_api_key_dict=user_api_key_dict,
+                    request_data=_data,
+                )
 
-        if data.get("stream", None) is not None and data["stream"] is True:
-            _iterator = litellm.utils.ModelResponseIterator(
-                model_response=_chat_response, convert_to_delta=True
-            )
-            _streaming_response = litellm.CustomStreamWrapper(
-                completion_stream=_iterator,
-                model=data.get("model", ""),
-                custom_llm_provider="cached_response",
-                logging_obj=data.get("litellm_logging_obj", None),
-            )
-            selected_data_generator = select_data_generator(
-                response=_streaming_response,
+                return StreamingResponse(
+                    selected_data_generator,
+                    media_type="text/event-stream",
+                    status_code=200,  # Return 200 for passthrough mode
+                )
+            _usage = litellm.Usage(prompt_tokens=0, completion_tokens=0, total_tokens=0)
+            _chat_response.usage = _usage  # type: ignore
+            return _chat_response
+        except RejectedRequestError as e:
+            _data = e.request_data
+            await proxy_logging_obj.post_call_failure_hook(
                 user_api_key_dict=user_api_key_dict,
+                original_exception=e,
                 request_data=_data,
             )
+            _chat_response = litellm.ModelResponse()
+            _chat_response.choices[0].message.content = e.message  # type: ignore
 
-            return StreamingResponse(
-                selected_data_generator,
-                media_type="text/event-stream",
-                status_code=(
-                    e.status_code
-                    if hasattr(e, "status_code")
-                    else status.HTTP_400_BAD_REQUEST
-                ),
+            if data.get("stream", None) is not None and data["stream"] is True:
+                _iterator = litellm.utils.ModelResponseIterator(
+                    model_response=_chat_response, convert_to_delta=True
+                )
+                _streaming_response = litellm.CustomStreamWrapper(
+                    completion_stream=_iterator,
+                    model=data.get("model", ""),
+                    custom_llm_provider="cached_response",
+                    logging_obj=data.get("litellm_logging_obj", None),
+                )
+                selected_data_generator = select_data_generator(
+                    response=_streaming_response,
+                    user_api_key_dict=user_api_key_dict,
+                    request_data=_data,
+                )
+
+                return StreamingResponse(
+                    selected_data_generator,
+                    media_type="text/event-stream",
+                    status_code=(
+                        e.status_code
+                        if hasattr(e, "status_code")
+                        else status.HTTP_400_BAD_REQUEST
+                    ),
+                )
+            _usage = litellm.Usage(prompt_tokens=0, completion_tokens=0, total_tokens=0)
+            _chat_response.usage = _usage  # type: ignore
+            return _chat_response
+        except Exception as e:
+            raise await base_llm_response_processor._handle_llm_api_exception(
+                e=e,
+                user_api_key_dict=user_api_key_dict,
+                proxy_logging_obj=proxy_logging_obj,
             )
-        _usage = litellm.Usage(prompt_tokens=0, completion_tokens=0, total_tokens=0)
-        _chat_response.usage = _usage  # type: ignore
-        return _chat_response
-    except Exception as e:
-        raise await base_llm_response_processor._handle_llm_api_exception(
-            e=e,
-            user_api_key_dict=user_api_key_dict,
-            proxy_logging_obj=proxy_logging_obj,
-        )
 
 
 @router.post(

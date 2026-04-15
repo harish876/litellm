@@ -753,7 +753,7 @@ def _remove_thought_signatures_from_messages(
 
     return processed_messages
 
-
+# TODO: Perf Lookup: Optimize
 def function_setup(  # noqa: PLR0915
     original_function: str, rules_obj, start_time, *args, **kwargs
 ):  # just run once to check if user wants to send their data anywhere - PostHog/Sentry/Slack/etc.
@@ -778,6 +778,7 @@ def function_setup(  # noqa: PLR0915
         get_coroutine_checker_fn = getattr(
             sys.modules[__name__], "get_coroutine_checker"
         )
+        # TODO: Perf Lookup
         coroutine_checker = get_coroutine_checker_fn()
 
         ## DYNAMIC CALLBACKS ##
@@ -5900,7 +5901,7 @@ def _get_model_info_helper(  # noqa: PLR0915
             )
         )
 
-
+#TODO: Perf Lookup: Optimize
 @lru_cache(maxsize=DEFAULT_MAX_LRU_CACHE_SIZE)
 def get_model_info(
     model: str,
